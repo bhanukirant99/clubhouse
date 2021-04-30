@@ -19,7 +19,8 @@ const firestore = firebase.firestore();
 const auth = firebase.auth();
 
 const messagesRef = firestore.collection("messages");
-const query = messagesRef.orderBy("createdAt").limit(25);
+// const query = messagesRef.orderBy("createdAt").limit(25);
+const query = messagesRef.orderBy("createdAt");
 
 const ChatMessage = (props) => {
   const { text, uid, photoURL } = props.message;
