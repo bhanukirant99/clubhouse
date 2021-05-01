@@ -1,9 +1,9 @@
 import "./style.css";
-
 import firebase from "firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useCollectionData } from "react-firebase-hooks/firestore";
 import { useEffect, useRef, useState } from "react";
+import { v4 } from "uuid";
 
 firebase.initializeApp({
   apiKey: process.env.REACT_APP_API_KEY,
@@ -18,10 +18,6 @@ firebase.initializeApp({
 const firestore = firebase.firestore();
 const auth = firebase.auth();
 
-const messagesRef = firestore.collection("messages");
-// const query = messagesRef.orderBy("createdAt").limit(25);
-const query = messagesRef.orderBy("createdAt");
-
 const ChatMessage = (props) => {
   const { text, uid, photoURL } = props.message;
   const messageClass = uid === auth.currentUser.uid ? "sent" : "received";
@@ -34,10 +30,33 @@ const ChatMessage = (props) => {
   );
 };
 
+// const messagesRef = firestore.collection("messages");
+// const query = messagesRef.orderBy("createdAt");
+
+const queryTwo = firestore
+  .collection("testMessages")
+  .where("roomId", "==", "fgfhfhfhgfhgfh");
+
+const useGetOneDocRef = (query) => {
+  const [docRef, setDocRef] = useState(null);
+  useEffect(() => {
+    query.get().then((doc) => setDocRef(doc.docs[0].ref));
+  }, []);
+  return { docRef };
+};
+
 const ChatRoom = () => {
-  const [messages] = useCollectionData(query, { idField: "id" });
+  const [messages, setMessages] = useState([]);
+  const { docRef } = useGetOneDocRef(queryTwo);
   const [formValue, setFormValue] = useState("");
   const chatRef = useRef();
+
+  useEffect(() => {
+    const unsub = queryTwo.onSnapshot((doc) =>
+      setMessages(doc.docs[0].data().messages)
+    );
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     chatRef?.current && chatRef.current.scrollIntoView({ behavior: "smooth" });
@@ -47,12 +66,16 @@ const ChatRoom = () => {
     e.preventDefault();
     const { uid, photoURL } = auth.currentUser;
 
-    await messagesRef.add({
-      text: formValue,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      uid,
-      photoURL,
-    });
+    docRef &&
+      (await docRef.update({
+        messages: firebase.firestore.FieldValue.arrayUnion({
+          id: v4(),
+          text: formValue,
+          createdAt: firebase.firestore.Timestamp.now(),
+          uid,
+          photoURL,
+        }),
+      }));
     setFormValue("");
   };
 
