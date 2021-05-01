@@ -43,6 +43,31 @@ const useGetOneDocRef = (query) => {
   return { docRef };
 };
 
+const useMounted = () => {
+  const isMounted = useRef(false);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => (isMounted.current = false);
+  }, []);
+  return isMounted;
+};
+
+const useSnapshot = (query) => {
+  const [data, setData] = useState(undefined);
+  const [loading, setLoading] = useState(true);
+  const mounted = useMounted();
+
+  useEffect(() => {
+    const unsubscribe = query.onSnapshot((doc) => {
+      mounted.current && setData(doc);
+      setLoading && mounted.current && setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  return { data, loading };
+};
+
 const ChatMessage = (props) => {
   const { text, uid, photoURL } = props.message;
   const messageClass = uid === auth.currentUser.uid ? "sent" : "received";
@@ -56,17 +81,14 @@ const ChatMessage = (props) => {
 };
 
 const ChatRoom = () => {
-  const [messages, setMessages] = useState([]);
   const { docRef } = useGetOneDocRef(query);
   const [formValue, setFormValue] = useState("");
   const chatRef = useRef();
+  const { data, loading } = useSnapshot(query);
 
-  useEffect(() => {
-    const unsubscribe = query.onSnapshot((doc) =>
-      setMessages(doc.docs[0].data().messages)
-    );
-    return () => unsubscribe();
-  }, []);
+  console.log({ loading });
+
+  const messages = data?.docs[0].data().messages || [];
 
   useEffect(() => {
     chatRef?.current && chatRef.current.scrollIntoView({ behavior: "smooth" });
