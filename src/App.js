@@ -1,7 +1,7 @@
 import "./style.css";
-import firebase from "firebase";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { useCollectionData } from "react-firebase-hooks/firestore";
+import firebase from "firebase/app";
+import "firebase/firestore";
+import "firebase/auth";
 import { useEffect, useRef, useState } from "react";
 import { v4 } from "uuid";
 
@@ -18,6 +18,31 @@ firebase.initializeApp({
 const firestore = firebase.firestore();
 const auth = firebase.auth();
 
+const query = firestore
+  .collection("testMessages")
+  .where("roomId", "==", "fgfhfhfhgfhgfh");
+
+const useAuth = (auth) => {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => setUser(user));
+    return () => unsubscribe();
+  }, []);
+
+  return { user, isUserLoggedIn: user !== null };
+};
+
+const useGetOneDocRef = (query) => {
+  const [docRef, setDocRef] = useState(null);
+
+  useEffect(() => {
+    query.get().then((doc) => setDocRef(doc.docs[0].ref));
+  }, []);
+
+  return { docRef };
+};
+
 const ChatMessage = (props) => {
   const { text, uid, photoURL } = props.message;
   const messageClass = uid === auth.currentUser.uid ? "sent" : "received";
@@ -30,32 +55,17 @@ const ChatMessage = (props) => {
   );
 };
 
-// const messagesRef = firestore.collection("messages");
-// const query = messagesRef.orderBy("createdAt");
-
-const queryTwo = firestore
-  .collection("testMessages")
-  .where("roomId", "==", "fgfhfhfhgfhgfh");
-
-const useGetOneDocRef = (query) => {
-  const [docRef, setDocRef] = useState(null);
-  useEffect(() => {
-    query.get().then((doc) => setDocRef(doc.docs[0].ref));
-  }, []);
-  return { docRef };
-};
-
 const ChatRoom = () => {
   const [messages, setMessages] = useState([]);
-  const { docRef } = useGetOneDocRef(queryTwo);
+  const { docRef } = useGetOneDocRef(query);
   const [formValue, setFormValue] = useState("");
   const chatRef = useRef();
 
   useEffect(() => {
-    const unsub = queryTwo.onSnapshot((doc) =>
+    const unsubscribe = query.onSnapshot((doc) =>
       setMessages(doc.docs[0].data().messages)
     );
-    return () => unsub();
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -66,16 +76,15 @@ const ChatRoom = () => {
     e.preventDefault();
     const { uid, photoURL } = auth.currentUser;
 
-    docRef &&
-      (await docRef.update({
-        messages: firebase.firestore.FieldValue.arrayUnion({
-          id: v4(),
-          text: formValue,
-          createdAt: firebase.firestore.Timestamp.now(),
-          uid,
-          photoURL,
-        }),
-      }));
+    await docRef.update({
+      messages: firebase.firestore.FieldValue.arrayUnion({
+        id: v4(),
+        text: formValue,
+        createdAt: firebase.firestore.Timestamp.now(),
+        uid,
+        photoURL,
+      }),
+    });
     setFormValue("");
   };
 
@@ -116,13 +125,14 @@ const SignOut = () => {
 };
 
 function App() {
-  const [user] = useAuthState(auth);
+  const { isUserLoggedIn } = useAuth(auth);
+
   return (
     <div className="App">
       <header>
         <SignOut />
       </header>
-      <section>{user ? <ChatRoom /> : <SignIn />}</section>
+      <section>{isUserLoggedIn ? <ChatRoom /> : <SignIn />}</section>
     </div>
   );
 }
